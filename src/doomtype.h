@@ -157,7 +157,11 @@ typedef int32_t boolean;
 
 #ifndef __cplusplus
 #ifndef _WIN32
+#ifndef _OUNCE // causes conflicts when compiling on s2
 enum {false = 0, true = 1};
+#else
+#include <stdbool.h> // probably need this.
+#endif
 #else
 #define false FALSE
 #define true TRUE

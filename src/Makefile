@@ -131,6 +131,11 @@ endif
 
 include Makefile.d/util.mk
 
+ifdef OUNCE
+export DEVKITPRO ?= /opt/devkitpro
+PREFIX := $(DEVKITPRO)/devkitA64/bin/aarch64-none-elf
+endif
+
 ifdef PREFIX
 CC:=$(PREFIX)-gcc
 endif
@@ -222,6 +227,15 @@ build_done==== Build is done, look for \
 
 all : $(exe)
 	$(call Echo,$(build_done))
+
+# pack elf into nro for s2
+ifdef OUNCE
+nro:=$(exe:.elf=.nro)
+all : $(nro)
+
+$(nro) : $(exe)
+	$(.)$(DEVKITPRO)/tools/bin/elf2nro $< $@
+endif
 
 ifndef VALGRIND
 dump : $(dbg).txt

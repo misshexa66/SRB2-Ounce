@@ -17,6 +17,7 @@ all_systems:=\
 	LINUX\
 	FREEBSD\
 	HAIKU\
+	OUNCE\
 
 # check for user specified system
 ifeq (,$(filter $(all_systems),$(.VARIABLES)))

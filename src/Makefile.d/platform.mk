@@ -22,7 +22,10 @@ ifdef MINGW64
 MINGW=1
 endif
 
-ifdef LINUX
+ifdef OUNCE
+platform=ounce
+include Makefile.d/ounce.mk
+else ifdef LINUX
 UNIX=1
 ifdef LINUX64
 NONX86=1
