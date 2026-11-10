@@ -1023,6 +1023,49 @@ void HU_clearChatChars(void)
 //
 // Returns true if key eaten
 //
+#ifdef _OUNCE
+static void HU_KeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	size_t i;
+	if (CHAT_MUTE)
+		return;
+	for (i = 0; text[i]; i++)
+	{
+		INT32 c = (unsigned char)text[i];
+		if (c != ' ' && (c < FONTSTART || c > FONTEND || !hu_font.chars[c - FONTSTART]))
+			return;
+	}
+	strlcpy(w_chat, text, sizeof w_chat);
+	c_input = min((size_t)max(arg->cursorPos, 0), strlen(w_chat));
+}
+
+static void HU_KeyboardCursor(const char *text, SwkbdMovedCursorArg *arg)
+{
+	(void)text;
+	c_input = min((size_t)max(arg->cursorPos, 0), strlen(w_chat));
+}
+
+static void HU_KeyboardSubmit(const char *text, SwkbdDecidedEnterArg *arg)
+{
+	SwkbdChangedStringArg final = {.cursorPos = arg->stringLen};
+	event_t enter = {0};
+	HU_KeyboardChanged(text, &final);
+	if (CHAT_MUTE || strcmp(text, w_chat))
+		return;
+	enter.type = ev_keydown;
+	enter.key = KEY_ENTER;
+	D_PostEvent(&enter);
+}
+
+static void HU_OpenKeyboard(void)
+{
+	chat_on_first_event = true;
+	if (!CHAT_MUTE)
+		I_OpenKeyboard(w_chat, HU_MAXMSGLEN,
+			HU_KeyboardChanged, HU_KeyboardCursor, HU_KeyboardSubmit);
+}
+#endif
+
 boolean HU_Responder(event_t *ev)
 {
 	INT32 c=0;
@@ -1070,6 +1113,9 @@ boolean HU_Responder(event_t *ev)
 			teamtalk = false;
 			chat_scrollmedown = true;
 			typelines = 1;
+#ifdef _OUNCE
+			HU_OpenKeyboard();
+#endif
 			return true;
 		}
 		if ((ev->key == gamecontrol[GC_TEAMKEY][0] || ev->key == gamecontrol[GC_TEAMKEY][1])
@@ -1082,6 +1128,9 @@ boolean HU_Responder(event_t *ev)
 			teamtalk = G_GametypeHasTeams(); // Don't teamtalk if we don't have teams.
 			chat_scrollmedown = true;
 			typelines = 1;
+#ifdef _OUNCE
+			HU_OpenKeyboard();
+#endif
 			return true;
 		}
 	}

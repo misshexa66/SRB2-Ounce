@@ -402,6 +402,10 @@ static void M_HandleLevelStats(INT32 choice);
 static void M_HandlePlaystyleMenu(INT32 choice);
 static boolean M_CancelConnect(void);
 static void M_HandleConnectIP(INT32 choice);
+#ifdef _OUNCE
+static void M_ConnectIP(INT32 choice);
+static boolean keyboard_connect_pending;
+#endif
 static void M_HandleSetupMultiPlayer(INT32 choice);
 static void M_HandleVideoMode(INT32 choice);
 
@@ -3070,6 +3074,17 @@ static void M_ChangeCvar(INT32 choice)
 		CV_AddValue(cv,choice);
 }
 
+#ifdef _OUNCE
+static consvar_t *keyboard_cvar;
+
+static void M_CvarKeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	(void)arg;
+	if (strcmp(text, keyboard_cvar->string))
+		CV_Set(keyboard_cvar, text);
+}
+#endif
+
 static boolean M_ChangeStringCvar(INT32 choice)
 {
 	consvar_t *cv = (consvar_t *)currentMenu->menuitems[itemOn].itemaction;
@@ -3206,6 +3221,11 @@ boolean M_Responder(event_t *ev)
 						ch = KEY_ENTER;
 						break;
 					case KEY_JOY1 + 3:
+#ifdef _OUNCE
+						if (currentMenu->menuitems[itemOn].itemaction == M_HandleAddons)
+							ch = KEY_TAB;
+						else
+#endif
 						ch = 'n';
 						break;
 					case KEY_MOUSE1 + 1:
@@ -3442,6 +3462,15 @@ boolean M_Responder(event_t *ev)
 	{
 		if ((currentMenu->menuitems[itemOn].status & IT_CVARTYPE) == IT_CV_STRING)
 		{
+#ifdef _OUNCE
+			if (ev->type == ev_keydown && ch == KEY_ENTER)
+			{
+				keyboard_cvar = currentMenu->menuitems[itemOn].itemaction;
+				I_OpenKeyboard(keyboard_cvar->string, MAXSTRINGLENGTH - 1,
+					M_CvarKeyboardChanged, NULL, NULL);
+				return true;
+			}
+#endif
 			// ignore ev_keydown events if the key maps to a character, since
 			// the ev_text event will follow immediately after in that case.
 			if (ev->type == ev_keydown && ch >= 32 && ch <= 127)
@@ -3789,6 +3818,9 @@ void M_ClearMenus(boolean callexitmenufunc)
 
 	if (currentMenu == &MessageDef) // Oh sod off!
 		currentMenu = &MainDef; // Not like it matters
+#ifdef _OUNCE
+	I_SetTextInputMode(false);
+#endif
 	menuactive = false;
 	hidetitlemap = false;
 
@@ -3876,6 +3908,15 @@ void M_Ticker(void)
 
 	if (dedicated)
 		return;
+
+#ifdef _OUNCE
+	if (keyboard_connect_pending)
+	{
+		keyboard_connect_pending = false;
+		if (menuactive && currentMenu->menuitems[itemOn].itemaction == M_HandleConnectIP)
+			M_ConnectIP(0);
+	}
+#endif
 
 	if (--skullAnimCounter <= 0)
 		skullAnimCounter = 8;
@@ -6574,7 +6615,11 @@ static void M_DrawAddons(void)
 	if (menusearch[0])
 		V_DrawString(x - 18, y + 8, V_ALLOWLOWERCASE, menusearch+1);
 	else
+#ifdef _OUNCE
+		V_DrawString(x - 18, y + 8, V_ALLOWLOWERCASE|V_TRANSLUCENT, "Y / Tab: Search");
+#else
 		V_DrawString(x - 18, y + 8, V_ALLOWLOWERCASE|V_TRANSLUCENT, "Type to search...");
+#endif
 	if (skullAnimCounter < 4)
 		V_DrawCharacter(x - 18 + V_StringWidth(menusearch+1, 0), y + 8,
 			'_' | 0x80, false);
@@ -6638,25 +6683,41 @@ static boolean M_ChangeStringAddons(INT32 choice)
 }
 #undef len
 
+static void M_RefreshAddonSearch(void)
+{
+	char *selected = NULL;
+	if (dirmenu && dirmenu[dir_on[menudepthleft]])
+		selected = Z_StrDup(dirmenu[dir_on[menudepthleft]] + DIR_STRING);
+	searchfilemenu(selected);
+}
+
+#ifdef _OUNCE
+static void M_SearchKeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	(void)arg;
+	if (!strcmp(text, menusearch + 1))
+		return;
+	strlcpy(menusearch + 1, text, MAXSTRINGLENGTH);
+	menusearch[0] = (char)strlen(menusearch + 1);
+	M_RefreshAddonSearch();
+}
+#endif
+
 static void M_HandleAddons(INT32 choice)
 {
 	boolean exitmenu = false; // exit to previous menu
 
-	if (M_ChangeStringAddons(choice))
+#ifdef _OUNCE
+	if (choice == KEY_TAB)
 	{
-		char *tempname = NULL;
-		if (dirmenu && dirmenu[dir_on[menudepthleft]])
-			tempname = Z_StrDup(dirmenu[dir_on[menudepthleft]]+DIR_STRING); // don't need to I_Error if can't make - not important, just QoL
-#if 0 // much slower
-		if (!preparefilemenu(true))
-		{
-			UNEXIST;
-			return;
-		}
-#else // streamlined
-		searchfilemenu(tempname);
-#endif
+		I_OpenKeyboard(menusearch + 1, MAXSTRINGLENGTH - 1,
+			M_SearchKeyboardChanged, NULL, NULL);
+		return;
 	}
+#endif
+
+	if (M_ChangeStringAddons(choice))
+		M_RefreshAddonSearch();
 
 	switch (choice)
 	{
@@ -11828,6 +11889,30 @@ static void M_ConnectIP(INT32 choice)
 		I_FinishUpdate(); // page flip or blit buffer
 }
 
+#ifdef _OUNCE
+static void M_AddressKeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	size_t i;
+	(void)arg;
+	for (i = 0; text[i]; i++)
+	{
+		unsigned char c = (unsigned char)text[i];
+		if (!((c >= '-' && c <= ':') || c == '[' || c == ']' || c == '%'
+			|| (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+			return;
+	}
+	strlcpy(setupm_ip, text, sizeof setupm_ip);
+}
+
+static void M_AddressKeyboardSubmit(const char *text, SwkbdDecidedEnterArg *arg)
+{
+	(void)arg;
+	M_AddressKeyboardChanged(text, NULL);
+	if (!strcmp(text, setupm_ip))
+		keyboard_connect_pending = true;
+}
+#endif
+
 // Tails 11-19-2002
 static void M_HandleConnectIP(INT32 choice)
 {
@@ -11847,8 +11932,13 @@ static void M_HandleConnectIP(INT32 choice)
 			break;
 
 		case KEY_ENTER:
+#ifdef _OUNCE
+			I_OpenKeyboard(setupm_ip, CONNIP_LEN - 1,
+				M_AddressKeyboardChanged, NULL, M_AddressKeyboardSubmit);
+#else
 			S_StartSound(NULL,sfx_menu1); // Tails
 			M_ConnectIP(1);
+#endif
 			break;
 
 		case KEY_ESCAPE:
@@ -12543,6 +12633,14 @@ static void M_InitPlayerSetupLua(void)
 }
 
 // Handle 1P/2P MP Setup
+#ifdef _OUNCE
+static void M_NameKeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	(void)arg;
+	strlcpy(setupm_name, text, sizeof setupm_name);
+}
+#endif
+
 static void M_HandleSetupMultiPlayer(INT32 choice)
 {
 	size_t   l;
@@ -12597,6 +12695,13 @@ static void M_HandleSetupMultiPlayer(INT32 choice)
 			break;
 
 		case KEY_ENTER:
+#ifdef _OUNCE
+			if (itemOn == 0)
+			{
+				I_OpenKeyboard(setupm_name, MAXPLAYERNAME, M_NameKeyboardChanged, NULL, NULL);
+				break;
+			}
+#endif
 			if (itemOn == 3
 			&& (R_SkinAvailable(setupm_cvdefaultskin->string) != setupm_fakeskin
 			|| setupm_cvdefaultcolor->value != setupm_fakecolor->color))

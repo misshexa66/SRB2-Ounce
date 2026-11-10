@@ -3295,17 +3295,81 @@ const char *I_GetSysName(void)
 }
 
 
+#ifdef _OUNCE
+static SwkbdInline ounce_kbd;
+static boolean ounce_kbd_ready;
+
+static void KeyboardExit(void)
+{
+	swkbdInlineClose(&ounce_kbd);
+}
+
+void I_OpenKeyboard(const char *text, size_t limit, SwkbdChangedStringCb changed,
+	SwkbdMovedCursorCb moved, SwkbdDecidedEnterCb submitted)
+{
+	SwkbdAppearArg appear;
+
+	if (!ounce_kbd_ready)
+	{
+		Result result = swkbdInlineCreate(&ounce_kbd);
+		if (R_SUCCEEDED(result))
+			result = swkbdInlineLaunchForLibraryApplet(
+				&ounce_kbd, SwkbdInlineMode_AppletDisplay, 0);
+
+		if (R_FAILED(result))
+		{
+			swkbdInlineClose(&ounce_kbd);
+			CONS_Printf("Keyboard failed: %08x\n", (unsigned)result);
+			return;
+		}
+
+		ounce_kbd_ready = true;
+		I_AddExitFunc(KeyboardExit);
+	}
+
+	swkbdInlineSetChangedStringCallback(&ounce_kbd, changed);
+	swkbdInlineSetMovedCursorCallback(&ounce_kbd, moved);
+	swkbdInlineSetDecidedEnterCallback(&ounce_kbd, submitted);
+	swkbdInlineSetInputText(&ounce_kbd, text);
+	swkbdInlineSetCursorPos(&ounce_kbd, strlen(text));
+
+	swkbdInlineMakeAppearArg(&appear, SwkbdType_QWERTY);
+	appear.stringLenMax = limit;
+	appear.dicFlag = 0;
+	appear.returnButtonFlag = 0;
+	swkbdInlineAppear(&ounce_kbd, &appear);
+}
+
+boolean I_PollKeyboard(void)
+{
+	if (!ounce_kbd_ready)
+		return false;
+
+	swkbdInlineUpdate(&ounce_kbd, NULL);
+	return ounce_kbd.state > SwkbdState_Initialized;
+}
+#endif
+
 void I_SetTextInputMode(boolean active)
 {
+#ifdef _OUNCE
+	if (!active && ounce_kbd_ready)
+		swkbdInlineDisappear(&ounce_kbd);
+#else
 	if (active)
 		SDL_StartTextInput();
 	else
 		SDL_StopTextInput();
+#endif
 }
 
 boolean I_GetTextInputMode(void)
 {
+#ifdef _OUNCE
+	return ounce_kbd_ready && ounce_kbd.state > SwkbdState_Initialized;
+#else
 	return SDL_IsTextInputActive();
+#endif
 }
 
 #endif

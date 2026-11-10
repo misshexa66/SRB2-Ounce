@@ -99,6 +99,10 @@ static size_t input_sel; // position of selection marker (I.E.: anything between
 static size_t input_len; // length of current line, used to bound cursor and such
 // notice: input does NOT include the "$" at the start of the line. - 11/3/16
 
+// Sequential command completion, also cleared by native keyboard edits.
+static char completioncmd[80 + sizeof("find ")] = "find ";
+static char *completion = &completioncmd[sizeof("find ")-1];
+
 // protos.
 static void CON_InputInit(void);
 static void CON_RecalcSize(void);
@@ -739,6 +743,9 @@ void CON_ToggleOff(void)
 		return;
 	}
 
+#ifdef _OUNCE
+	I_SetTextInputMode(false);
+#endif
 	con_destlines = 0;
 	con_curlines = 0;
 	CON_ClearHUD();
@@ -918,14 +925,40 @@ static void CON_InputDelChar(void)
 // ----
 //
 
+#ifdef _OUNCE
+static void CON_KeyboardChanged(const char *text, SwkbdChangedStringArg *arg)
+{
+	Lock_state();
+	strlcpy(inputlines[inputline], text, sizeof inputlines[inputline]);
+	input_len = strlen(inputlines[inputline]);
+	input_cur = input_sel = min((size_t)max(arg->cursorPos, 0), input_len);
+	completion[0] = 0;
+	Unlock_state();
+}
+
+static void CON_KeyboardCursor(const char *text, SwkbdMovedCursorArg *arg)
+{
+	(void)text;
+	Lock_state();
+	input_cur = input_sel = min((size_t)max(arg->cursorPos, 0), input_len);
+	Unlock_state();
+}
+
+static void CON_KeyboardSubmit(const char *text, SwkbdDecidedEnterArg *arg)
+{
+	SwkbdChangedStringArg final = {.cursorPos = arg->stringLen};
+	event_t enter = {0};
+	CON_KeyboardChanged(text, &final);
+	enter.type = ev_keydown;
+	enter.key = KEY_ENTER;
+	D_PostEvent(&enter);
+}
+#endif
+
 // Handles console key input
 //
 boolean CON_Responder(event_t *ev)
 {
-	// sequential completions a la 4dos
-	static char completioncmd[80 + sizeof("find ")] = "find ";
-	static char *completion = &completioncmd[sizeof("find ")-1];
-
 	static INT32 skips;
 
 	static INT32   com_skips;
@@ -956,6 +989,11 @@ boolean CON_Responder(event_t *ev)
 		{
 			I_SetTextInputMode(con_destlines == 0); // inverse, since this is changed next tic.
 			consoletoggle = true;
+#ifdef _OUNCE
+			if (con_destlines == 0)
+				I_OpenKeyboard(inputlines[inputline], CON_MAXPROMPTCHARS - 1,
+					CON_KeyboardChanged, CON_KeyboardCursor, CON_KeyboardSubmit);
+#endif
 			return true;
 		}
 
@@ -970,6 +1008,15 @@ boolean CON_Responder(event_t *ev)
 			}
 			return false;
 		}
+
+#ifdef _OUNCE
+		if (consoleready && key == KEY_JOY1)
+		{
+			I_OpenKeyboard(inputlines[inputline], CON_MAXPROMPTCHARS - 1,
+				CON_KeyboardChanged, CON_KeyboardCursor, CON_KeyboardSubmit);
+			return true;
+		}
+#endif
 
 		// escape key toggle off console
 		if (key == KEY_ESCAPE)

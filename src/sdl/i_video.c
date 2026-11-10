@@ -1170,6 +1170,11 @@ void I_OsPolling(void)
 {
 	SDL_Keymod mod;
 
+#ifdef _OUNCE
+	if (I_PollKeyboard())
+		return;
+#endif
+
 	if (consolevent)
 		I_GetConsoleEvents();
 	if (SDL_WasInit(SDL_INIT_JOYSTICK) == SDL_INIT_JOYSTICK)

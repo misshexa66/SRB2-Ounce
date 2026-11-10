@@ -347,4 +347,13 @@ void I_SetTextInputMode(boolean active);
  */
 boolean I_GetTextInputMode(void);
 
+#ifdef _OUNCE
+#include <switch/applets/swkbd.h>
+#include <switch/result.h>
+
+void I_OpenKeyboard(const char *text, size_t limit, SwkbdChangedStringCb changed,
+	SwkbdMovedCursorCb moved, SwkbdDecidedEnterCb submitted);
+boolean I_PollKeyboard(void);
+#endif
+
 #endif
