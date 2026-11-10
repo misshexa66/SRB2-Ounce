@@ -451,7 +451,7 @@ void CL_QueryServerList (msg_server_t *server_list)
 		{
 			INT32 node = I_NetMakeNodewPort(server_list[i].ip, server_list[i].port);
 			if (node == -1)
-				break; // no more node free
+				continue; // skip server instead of just giving up
 			SendAskInfo(node);
 			// Force close the connection so that servers can't eat
 			// up nodes forever if we never get a reply back from them
