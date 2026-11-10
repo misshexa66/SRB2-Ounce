@@ -17,6 +17,10 @@
 /// \file
 /// \brief Main program, simply calls D_SRB2Main and D_SRB2Loop, the high level loop.
 
+#ifdef _OUNCE
+#include <switch.h>
+#endif
+
 #include "../doomdef.h"
 #include "../m_argv.h"
 #include "../d_main.h"
@@ -196,6 +200,16 @@ int main(int argc, char **argv)
 
 	//I_OutputMsg("I_StartupSystem() ...\n");
 	I_StartupSystem();
+
+	Result result = socketInitializeDefault();
+	if (R_FAILED(result))
+		I_OutputMsg("Socket initialization failed: %08x\n", (unsigned)result);
+	else
+		I_AddExitFunc(socketExit);
+#ifdef _OUNCE
+
+#endif
+
 #if defined (_WIN32)
 	{
 #if 0 // just load the DLL
