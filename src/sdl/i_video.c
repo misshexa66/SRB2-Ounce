@@ -195,6 +195,10 @@ static void SDLSetMode(INT32 width, INT32 height, SDL_bool fullscreen, SDL_bool 
 	realwidth = vid.width;
 	realheight = vid.height;
 
+#ifdef _OUNCE
+		fullscreen = SDL_FALSE; //fullscreen messes up the window sizing
+#endif
+
 	if (window)
 	{
 		if (fullscreen)
