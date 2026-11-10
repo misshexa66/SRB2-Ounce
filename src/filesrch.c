@@ -1154,7 +1154,18 @@ boolean preparefilemenu(boolean samedepth)
 		I_Error("preparefilemenu(): could not reallocate coredirmenu.");
 	}
 
+#ifndef _OUNCE
 	rewinddir(dirhandle);
+#else
+	closedir(dirhandle); //libounce doesn't have rewinddir..?
+	if (!(dirhandle = opendir(menupath)))
+	{
+		closefilemenu(false);
+		if (tempname)
+			Z_Free(tempname);
+		return false;
+	}
+#endif
 
 	while ((pos+folderpos) < sizecoredirmenu)
 	{
