@@ -82,6 +82,13 @@ boolean LoadGL(void)
 #ifndef STATIC_OPENGL
 	const char *OGLLibname = NULL;
 
+#ifdef _OUNCE
+	//gl 2.1 pretty please 
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#endif
+
 	if (M_CheckParm("-OGLlib") && M_IsNextParm())
 		OGLLibname = M_GetNextParm();
 
@@ -119,8 +126,8 @@ boolean OglSdlSurface(INT32 w, INT32 h)
 		gl_renderer = pglGetString(GL_RENDERER);
 		gl_extensions = pglGetString(GL_EXTENSIONS);
 
-		GL_DBG_Printf("OpenGL %s\n", gl_version);
-		GL_DBG_Printf("GPU: %s\n", gl_renderer);
+		CONS_Printf("OpenGL %s\n", gl_version);
+		CONS_Printf("GPU: %s\n", gl_renderer);
 		GL_DBG_Printf("Extensions: %s\n", gl_extensions);
 
 		if (strcmp((const char*)gl_renderer, "GDI Generic") == 0 &&
