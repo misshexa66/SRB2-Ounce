@@ -230,11 +230,22 @@ all : $(exe)
 
 # pack elf into nro for s2
 ifdef OUNCE
+APP_TITLE ?= Sonic Robo Blast 2
+APP_AUTHOR ?= Sonic Team Jr, Hexa
+APP_VERSION ?= 2.2.15
+APP_ICON ?= ../srb2.jpg
+
 nro:=$(exe:.elf=.nro)
+nacp:=$(exe:.elf=.nacp)
 all : $(nro)
 
-$(nro) : $(exe)
-	$(.)$(DEVKITPRO)/tools/bin/elf2nro $< $@
+$(nacp) : Makefile | $(bin)/
+	$(.)"$(DEVKITPRO)/tools/bin/nacptool" --create \
+		"$(APP_TITLE)" "$(APP_AUTHOR)" "$(APP_VERSION)" "$@"
+
+$(nro) : $(exe) $(nacp) $(APP_ICON) Makefile
+	$(.)"$(DEVKITPRO)/tools/bin/elf2nro" "$<" "$@" \
+		--icon="$(APP_ICON)" --nacp="$(nacp)"
 endif
 
 ifndef VALGRIND
