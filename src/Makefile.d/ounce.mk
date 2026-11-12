@@ -14,7 +14,8 @@ EXENAME?=srb2-switch2.elf
 
 PKG_CONFIG:=$(DEVKITPRO)/portlibs/switch2/bin/aarch64-none-elf-pkg-config
 
-ounce_arch:=-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -ftls-model=local-exec
+include $(DEVKITPRO)/libounce/switch2_cpu.mk
+ounce_arch:=$(SWITCH2_CPU) -mtp=soft -fPIE -ftls-model=local-exec
 
 opts+=$(ounce_arch) -std=gnu11 -D_OUNCE -D__SWITCH2__\
     -I$(DEVKITPRO)/portlibs/switch2/include \
